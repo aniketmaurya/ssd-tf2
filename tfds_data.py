@@ -16,7 +16,7 @@ class Dataset:
     """
 
     def __init__(self, data_dir, default_boxes,
-                 new_size, augmentation=None):
+                 new_size, mode='train', augmentation=None):
         super(Dataset, self).__init__()
         self.idx_to_name = [
             'aeroplane', 'bicycle', 'bird', 'boat',
@@ -27,21 +27,17 @@ class Dataset:
         self.name_to_idx = dict([(v, k)
                                  for k, v in enumerate(self.idx_to_name)])
 
-        data = tfds.load(
-            'voc', split='train',
+        data, info = tfds.load(
+            'voc', split=mode,
             data_dir='/data/tensorflow_datasets',
-            shuffle_files=True)
+            shuffle_files=True, with_info=True)
 
         self.default_boxes = default_boxes
         self.new_size = new_size
 
+        self.info = info
         self.data = data.map(self.clean_data)
         # self.data = self.scaleup_bbox(self.data)
-
-        if augmentation == None:
-            self.augmentation = ['original']
-        else:
-            self.augmentation = augmentation + ['original']
 
 
     @tf.function
@@ -59,7 +55,8 @@ class Dataset:
 
     @tf.function
     def clean_data(self, data):
-        image = tf.image.resize(data['image'], self.new_size)
+        image = tf.image.resize(data['image'], (self.new_size, self.new_size))
+        image = (image/127.0) - 1.0
         filename = data['image/filename']
         labels = data['labels']
         bbox = data['objects']['bbox']
@@ -94,21 +91,25 @@ class Dataset:
 def create_batch_generator(default_boxes,
                            new_size, batch_size, num_batches,
                            augmentation=None, data_dir='/data/tensorflow_datasets'):
-    dataset = Dataset(data_dir, default_boxes,
-                     new_size=new_size)
-
+    train_dataset = Dataset(data_dir, default_boxes,
+                     new_size=new_size, mode='train')
+    
+    val_dataset = Dataset(data_dir, default_boxes,
+                     new_size=new_size, mode='validation')
     info = {
-        'idx_to_name': dataset.idx_to_name,
-        'name_to_idx': dataset.name_to_idx,
-        # 'length': len(dataset),
+        'idx_to_name': train_dataset.idx_to_name,
+        'name_to_idx': train_dataset.name_to_idx,
+        'length': train_dataset.info.splits['train'].num_examples,
         # 'image_dir': dataset.image_dir,
         # 'anno_dir': dataset.anno_dir
     }
 
-    data_gen = dataset.generate()
+    data_gen = train_dataset.generate()
+    val_gen = val_dataset.generate()
     if batch_size:
         data_gen = data_gen.batch(batch_size)
+        val_gen = val_gen.batch(batch_size)
     if num_batches:
-        return data_gen.take(num_batches), info
-    else:
-        return data_gen, info
+        data = data_gen.take(num_batches)
+    
+    return data_gen, val_gen, info
