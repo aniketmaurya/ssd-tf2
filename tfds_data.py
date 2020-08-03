@@ -41,6 +41,7 @@ class Dataset:
         self.name_to_idx = dict([(v, k)
                                  for k, v in enumerate(self.idx_to_name)])
         self.augmentation = augmentation
+        self.mode = mode
         self.new_size = new_size
         self.default_boxes = default_boxes
 
@@ -53,12 +54,19 @@ class Dataset:
         self.data = data.map(self.clean_data, AUTOTUNE)
     
     @tf.function
-    def image_preprocessing(self, filename, image, boxes, labels):
+    def augmentation(self, image, boxes, labels):
         if tf.random.uniform(()) > 0.5:
             image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
-
+        
         if tf.random.uniform(()) > 0.5:
             image = tf.image.random_jpeg_quality(image)
+        
+        return image, boxes, labels
+
+    @tf.function
+    def image_preprocessing(self, filename, image, boxes, labels):
+        if self.mode == 'train':
+            image, boxes, labels = self.augmentation(image, boxes, labels)
 
         image = tf.image.resize(image, (self.new_size, self.new_size))
         image = (image / 127.0) - 1.0
