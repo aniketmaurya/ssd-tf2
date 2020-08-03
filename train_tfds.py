@@ -65,14 +65,12 @@ if __name__ == '__main__':
 
     default_boxes = generate_default_boxes(config)
 
-    batch_generator, val_generator, info = create_batch_generator(
-        default_boxes,
-        config['image_size'],
-        args.batch_size, args.num_batches)
+    batch_generator, val_generator, info = create_batch_generator(default_boxes, config['image_size'], args.batch_size,
+                                                                  args.num_batches)
     try:
         ssd = create_ssd(NUM_CLASSES, args.arch,
-                        args.pretrained_type,
-                        checkpoint_dir=args.checkpoint_dir)
+                         args.pretrained_type,
+                         checkpoint_dir=args.checkpoint_dir)
     except Exception as e:
         print(e)
         print('The program is exiting...')
