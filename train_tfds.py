@@ -79,6 +79,7 @@ if __name__ == '__main__':
     criterion = create_losses(args.neg_ratio, NUM_CLASSES)
 
     steps_per_epoch = info['length'] // args.batch_size
+    val_steps_per_epoch = info['val_length'] // args.batch_size
     print('steps_per_epoch:', steps_per_epoch)
 
     lr_fn = PiecewiseConstantDecay(
@@ -112,11 +113,10 @@ if __name__ == '__main__':
                 tqdm.write('Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}'.format(
                     epoch + 1, i + 1, time.time() - start, avg_loss, avg_conf_loss, avg_loc_loss))
 
-
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0
         avg_val_loc_loss = 0.0
-        for i, (_, imgs, gt_confs, gt_locs) in enumerate(val_generator):
+        for i, (_, imgs, gt_confs, gt_locs) in tqdm(enumerate(val_generator), desc='Validation', total=val_steps_per_epoch):
             val_confs, val_locs = ssd(imgs)
             val_conf_loss, val_loc_loss = criterion(
                 val_confs, val_locs, gt_confs, gt_locs)
@@ -124,6 +124,7 @@ if __name__ == '__main__':
             avg_val_loss = (avg_val_loss * i + val_loss.numpy()) / (i + 1)
             avg_val_conf_loss = (avg_val_conf_loss * i + val_conf_loss.numpy()) / (i + 1)
             avg_val_loc_loss = (avg_val_loc_loss * i + val_loc_loss.numpy()) / (i + 1)
+        tqdm.write(f'avg_val_conf_loss: {avg_val_conf_loss} | avg_val_loc_loss: {avg_val_loc_loss}')
 
         with train_summary_writer.as_default():
             tf.summary.scalar('loss', avg_loss, step=epoch)
