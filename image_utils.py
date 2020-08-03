@@ -176,3 +176,28 @@ def horizontal_flip(img, boxes, labels):
         boxes[:, 3]], axis=1)
 
     return img, boxes, labels
+
+
+@tf.function
+def horizontal_flip_tf(img, boxes, labels):
+    """ Function to horizontally flip the image
+        The gt boxes will be need to be modified accordingly
+
+    Args:
+        img: the original image w/o rescaling and resizing
+        boxes: gt boxes tensor (num_boxes, 4)
+        labels: gt labels tensor (num_boxes,)
+
+    Returns:
+        img: the horizontally flipped tf Image
+        boxes: horizontally flipped gt boxes tensor (num_boxes, 4)
+        labels: gt labels tensor (num_boxes,)
+    """
+    img = tf.image.flip_left_right(img)
+    boxes = tf.stack([
+        1 - boxes[:, 2],
+        boxes[:, 1],
+        1 - boxes[:, 0],
+        boxes[:, 3]], axis=1)
+
+    return img, boxes, labels
