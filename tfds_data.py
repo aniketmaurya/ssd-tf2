@@ -8,6 +8,7 @@ from image_utils import horizontal_flip_tf
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
+
 def draw_boxes(image: np.ndarray, boxes: np.ndarray):
     pil_image = Image.fromarray(image)
     h, w = pil_image.size
@@ -50,23 +51,22 @@ class Dataset:
 
         self.info = info
         self.data = data.map(self.clean_data, AUTOTUNE)
-        # self.data = self.scaleup_bbox(self.data)
 
     
     @tf.function
-    def preprocessing(self, filename, image, boxes, labels):
+    def image_preprocessing(self, filename, image, boxes, labels):
         if tf.random.uniform(()) > 0.5:
             image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
 
         image = tf.image.resize(image, (self.new_size, self.new_size))
-        image = (image/127.0) - 1.0
-        
+        image = (image / 127.0) - 1.0
+
         return filename, image, boxes, labels
+
 
     @tf.function
     def clean_data(self, data):
-        image = tf.image.resize(data['image'], (self.new_size, self.new_size))
-        image = (image/127.0) - 1.0
+        image = data['image']
         filename = data['image/filename']
         labels = data['objects']['label']
         bbox = data['objects']['bbox']
@@ -92,7 +92,7 @@ class Dataset:
             labels: tensor of shape (num_gt,)
         """
         data = self.data
-        data = data.map(self.preprocessing, AUTOTUNE)
+        data = data.map(self.image_preprocessing, AUTOTUNE)
         data = data.map(self.map_compute_target, AUTOTUNE)
         return data
 
