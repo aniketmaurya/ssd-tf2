@@ -51,18 +51,19 @@ class Dataset:
 
         self.info = info
         self.data = data.map(self.clean_data, AUTOTUNE)
-
     
     @tf.function
     def image_preprocessing(self, filename, image, boxes, labels):
         if tf.random.uniform(()) > 0.5:
             image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
 
+        if tf.random.uniform(()) > 0.5:
+            image = tf.image.random_jpeg_quality(image)
+
         image = tf.image.resize(image, (self.new_size, self.new_size))
         image = (image / 127.0) - 1.0
 
         return filename, image, boxes, labels
-
 
     @tf.function
     def clean_data(self, data):
@@ -74,14 +75,12 @@ class Dataset:
         
         return filename, image, xy_bbox, labels
 
-
     @tf.function
     def map_compute_target(self, filename, image, bbox, labels):
         tout = [tf.int64, tf.float32]
         gt_confs, gt_locs = tf.py_function(compute_target, [self.default_boxes, bbox, labels], tout)
             
         return filename, image, gt_confs, gt_locs
-
 
     def generate(self):
         """
