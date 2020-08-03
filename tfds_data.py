@@ -58,7 +58,7 @@ class Dataset:
         if tf.random.uniform(()) > 0.5:
             image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
 
-        image = tf.image.resize(data['image'], (self.new_size, self.new_size))
+        image = tf.image.resize(image, (self.new_size, self.new_size))
         image = (image/127.0) - 1.0
         
         return filename, image, boxes, labels
