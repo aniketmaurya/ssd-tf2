@@ -1,17 +1,18 @@
 import argparse
-import tensorflow as tf
 import os
 import sys
 import time
-import yaml
 
+import tensorflow as tf
+import yaml
 from tensorflow.keras.optimizers.schedules import PiecewiseConstantDecay
-from tfds_data import create_batch_generator
-from anchor import generate_default_boxes
-from network import create_ssd
-from losses import create_losses
 from tqdm.auto import tqdm, trange
- 
+
+from anchor import generate_default_boxes
+from losses import create_losses
+from network import create_ssd
+from tfds_data import create_batch_generator
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--arch', default='ssd300')
 parser.add_argument('--batch-size', default=32, type=int)

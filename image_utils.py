@@ -1,10 +1,11 @@
 import os
-from PIL import Image
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import random
+
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from PIL import Image
 
 from box_utils import compute_iou
 

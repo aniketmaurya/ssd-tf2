@@ -1,23 +1,22 @@
-import tensorflow as tf
-import os
 import numpy as np
+import tensorflow as tf
+import tensorflow_datasets as tfds
+from PIL import Image, ImageDraw
 
 from box_utils import compute_target
 from image_utils import horizontal_flip_tf
 
-import tensorflow_datasets as tfds
 
-
-def draw_boxes(image: np.ndarray, boxes:np.ndarray):
+def draw_boxes(image: np.ndarray, boxes: np.ndarray):
     pil_image = Image.fromarray(image)
     h, w = pil_image.size
     patch = ImageDraw.Draw(pil_image)
-    
+
     for box in boxes:
         xmin, ymin, xmax, ymax = box * (h, w, h, w)
-        
+
         patch.rectangle((xmin, ymin, xmax, ymax))
-    
+
     return pil_image
 
 
@@ -39,14 +38,14 @@ class Dataset:
             'sheep', 'sofa', 'train', 'tvmonitor']
         self.name_to_idx = dict([(v, k)
                                  for k, v in enumerate(self.idx_to_name)])
+        self.augmentation = augmentation
+        self.new_size = new_size
+        self.default_boxes = default_boxes
 
         data, info = tfds.load(
             'voc', split=mode,
             data_dir=data_dir,
             shuffle_files=True, with_info=True)
-
-        self.default_boxes = default_boxes
-        self.new_size = new_size
 
         self.info = info
         self.data = data.map(self.clean_data)
@@ -99,12 +98,12 @@ class Dataset:
 
 def create_batch_generator(default_boxes,
                            new_size, batch_size, num_batches=None,
-                           augmentation=None, data_dir='/data/tensorflow_datasets'):
+                           augmentation=True, data_dir='/data/tensorflow_datasets'):
     train_dataset = Dataset(default_boxes,
-                     new_size=new_size, mode='train', data_dir=data_dir)
-    
+                            new_size=new_size, mode='train', data_dir=data_dir, augmentation=augmentation)
+
     val_dataset = Dataset(default_boxes,
-                     new_size=new_size, mode='validation', data_dir=data_dir)
+                          new_size=new_size, mode='validation', data_dir=data_dir)
     info = {
         'idx_to_name': train_dataset.idx_to_name,
         'name_to_idx': train_dataset.name_to_idx,
@@ -119,7 +118,7 @@ def create_batch_generator(default_boxes,
         data_gen = data_gen.batch(batch_size)
         val_gen = val_gen.batch(batch_size)
     if num_batches:
-        data = data_gen.take(num_batches)
+        data_gen = data_gen.take(num_batches)
     print(f'Generated data with batch-size:{batch_size} and num-batches:{num_batches}')
     print(f'{info}')
     return data_gen, val_gen, info
