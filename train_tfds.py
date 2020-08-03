@@ -113,6 +113,8 @@ if __name__ == '__main__':
                 tqdm.write('Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}'.format(
                     epoch + 1, i + 1, time.time() - start, avg_loss, avg_conf_loss, avg_loc_loss))
 
+        tqdm.write(f'End of Epoch:{epoch+1}:  Loss: {avg_loss} | Loc Loss: {avg_loc_loss} | Conf Loss: {avg_conf_loss}')
+
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0
         avg_val_loc_loss = 0.0
@@ -124,7 +126,8 @@ if __name__ == '__main__':
             avg_val_loss = (avg_val_loss * i + val_loss.numpy()) / (i + 1)
             avg_val_conf_loss = (avg_val_conf_loss * i + val_conf_loss.numpy()) / (i + 1)
             avg_val_loc_loss = (avg_val_loc_loss * i + val_loc_loss.numpy()) / (i + 1)
-        tqdm.write(f'avg_val_conf_loss: {avg_val_conf_loss} | avg_val_loc_loss: {avg_val_loc_loss}')
+
+        tqdm.write(f'Validation Loss-  Loss: {avg_val_loss} | Conf loss: {avg_val_conf_loss} | Loc loss: {avg_val_loc_loss}')
 
         with train_summary_writer.as_default():
             tf.summary.scalar('loss', avg_loss, step=epoch)
