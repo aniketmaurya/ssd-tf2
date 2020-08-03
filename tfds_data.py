@@ -58,7 +58,7 @@ class Dataset:
             image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
         
         if tf.random.uniform(()) > 0.5:
-            image = tf.image.random_jpeg_quality(image)
+            image = tf.image.random_jpeg_quality(image, 70, 95)
         
         return image, boxes, labels
 
