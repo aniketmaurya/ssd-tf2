@@ -1,11 +1,24 @@
-import tensorflow as tf
-import os
 import numpy as np
+import tensorflow as tf
+import tensorflow_datasets as tfds
+from PIL import Image, ImageDraw
 
 from box_utils import compute_target
-from image_utils import random_patching, horizontal_flip
+from image_utils import horizontal_flip_tf
 
-import tensorflow_datasets as tfds
+AUTOTUNE = tf.data.experimental.AUTOTUNE
+
+def draw_boxes(image: np.ndarray, boxes: np.ndarray):
+    pil_image = Image.fromarray(image)
+    h, w = pil_image.size
+    patch = ImageDraw.Draw(pil_image)
+
+    for box in boxes:
+        xmin, ymin, xmax, ymax = box * (h, w, h, w)
+
+        patch.rectangle((xmin, ymin, xmax, ymax))
+
+    return pil_image
 
 
 class Dataset:
@@ -15,8 +28,8 @@ class Dataset:
         data_dir: dataset data dir (ex: '/data/tensorflow_datasets')
     """
 
-    def __init__(self, data_dir, default_boxes,
-                 new_size, mode='train', augmentation=None):
+    def __init__(self, default_boxes,
+                 new_size, mode='train', augmentation=None, data_dir='/data/tensorflow_datasets'):
         super(Dataset, self).__init__()
         self.idx_to_name = [
             'aeroplane', 'bicycle', 'bird', 'boat',
@@ -26,39 +39,36 @@ class Dataset:
             'sheep', 'sofa', 'train', 'tvmonitor']
         self.name_to_idx = dict([(v, k)
                                  for k, v in enumerate(self.idx_to_name)])
+        self.augmentation = augmentation
+        self.new_size = new_size
+        self.default_boxes = default_boxes
 
         data, info = tfds.load(
             'voc', split=mode,
-            data_dir='/data/tensorflow_datasets',
+            data_dir=data_dir,
             shuffle_files=True, with_info=True)
 
-        self.default_boxes = default_boxes
-        self.new_size = new_size
-
         self.info = info
-        self.data = data.map(self.clean_data)
+        self.data = data.map(self.clean_data, AUTOTUNE)
         # self.data = self.scaleup_bbox(self.data)
 
-
-    @tf.function
-    def scaleup_bbox(filename, image, labels, gt_bbox):
-        shape = tf.cast(tf.shape(image), tf.float32)
-        # tf.print('shape', shape)
-        
-        scale_value = tf.concat((shape[:2], shape[:2]), 0, 'scale_value')
-        # tf.print('scale value', scale_value)
-        
-        scaled_bbox = gt_bbox * scale_value
-        
-        return filename, image, scaled_bbox, labels
     
+    @tf.function
+    def preprocessing(self, filename, image, boxes, labels):
+        if tf.random.uniform(()) > 0.5:
+            image, boxes, labels = horizontal_flip_tf(image, boxes, labels)
+
+        image = tf.image.resize(image, (self.new_size, self.new_size))
+        image = (image/127.0) - 1.0
+        
+        return filename, image, boxes, labels
 
     @tf.function
     def clean_data(self, data):
         image = tf.image.resize(data['image'], (self.new_size, self.new_size))
         image = (image/127.0) - 1.0
         filename = data['image/filename']
-        labels = data['labels']
+        labels = data['objects']['label']
         bbox = data['objects']['bbox']
         xy_bbox = tf.concat((bbox[..., -3::-1], bbox[..., -1:-3:-1]), 1)
         
@@ -82,20 +92,17 @@ class Dataset:
             labels: tensor of shape (num_gt,)
         """
         data = self.data
-        # rescale image
-        
-        data = data.map(self.map_compute_target)
+        data = data.map(self.preprocessing, AUTOTUNE)
+        data = data.map(self.map_compute_target, AUTOTUNE)
         return data
 
 
-def create_batch_generator(default_boxes,
-                           new_size, batch_size, num_batches,
-                           augmentation=None, data_dir='/data/tensorflow_datasets'):
-    train_dataset = Dataset(data_dir, default_boxes,
-                     new_size=new_size, mode='train')
-    
-    val_dataset = Dataset(data_dir, default_boxes,
-                     new_size=new_size, mode='validation')
+def create_batch_generator(default_boxes, new_size, batch_size, num_batches=None, prefetch=True, data_dir='/data/tensorflow_datasets'):
+    train_dataset = Dataset(default_boxes,
+                            new_size=new_size, mode='train', data_dir=data_dir)
+
+    val_dataset = Dataset(default_boxes,
+                          new_size=new_size, mode='validation', data_dir=data_dir)
     info = {
         'idx_to_name': train_dataset.idx_to_name,
         'name_to_idx': train_dataset.name_to_idx,
@@ -106,10 +113,19 @@ def create_batch_generator(default_boxes,
 
     data_gen = train_dataset.generate()
     val_gen = val_dataset.generate()
+
     if batch_size:
         data_gen = data_gen.batch(batch_size)
         val_gen = val_gen.batch(batch_size)
     if num_batches:
-        data = data_gen.take(num_batches)
-    
+        data_gen = data_gen.take(num_batches)
+
+    if prefetch:
+        print('data generator is prefetched...')
+        data_gen = data_gen.prefetch(AUTOTUNE)
+        val_gen = val_gen.prefetch(AUTOTUNE)
+
+    print(f'Generated data with batch-size:{batch_size} and num-batches:{num_batches}')
+    print(f'{info}')
+
     return data_gen, val_gen, info

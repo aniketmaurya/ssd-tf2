@@ -1,16 +1,17 @@
 import argparse
-import tensorflow as tf
 import os
 import sys
 import time
+
+import tensorflow as tf
 import yaml
-
 from tensorflow.keras.optimizers.schedules import PiecewiseConstantDecay
-from tfds_data import create_batch_generator
-from anchor import generate_default_boxes
-from network import create_ssd
-from losses import create_losses
+from tqdm.auto import tqdm, trange
 
+from anchor import generate_default_boxes
+from losses import create_losses
+from network import create_ssd
+from tfds_data import create_batch_generator
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--arch', default='ssd300')
@@ -64,16 +65,12 @@ if __name__ == '__main__':
 
     default_boxes = generate_default_boxes(config)
 
-    batch_generator, val_generator, info = create_batch_generator(
-        default_boxes,
-        config['image_size'],
-        args.batch_size, args.num_batches)
-    batch_generator = batch_generator.take(10)
-    val_generator = val_generator.take(1)
+    batch_generator, val_generator, info = create_batch_generator(default_boxes, config['image_size'], args.batch_size,
+                                                                  args.num_batches)
     try:
         ssd = create_ssd(NUM_CLASSES, args.arch,
-                        args.pretrained_type,
-                        checkpoint_dir=args.checkpoint_dir)
+                         args.pretrained_type,
+                         checkpoint_dir=args.checkpoint_dir)
     except Exception as e:
         print(e)
         print('The program is exiting...')
@@ -99,20 +96,22 @@ if __name__ == '__main__':
     val_summary_writer = tf.summary.create_file_writer(val_log_dir)
 
 
-    for epoch in range(args.num_epochs):
+    for epoch in trange(args.num_epochs, desc='Epoch'):
         avg_loss = 0.0
         avg_conf_loss = 0.0
         avg_loc_loss = 0.0
         start = time.time()
-        for i, (_, imgs, gt_confs, gt_locs) in enumerate(batch_generator):
+        for i, (_, imgs, gt_confs, gt_locs) in tqdm(enumerate(batch_generator), desc='Steps', total=steps_per_epoch):
             loss, conf_loss, loc_loss, l2_loss = train_step(
                 imgs, gt_confs, gt_locs, ssd, criterion, optimizer)
             avg_loss = (avg_loss * i + loss.numpy()) / (i + 1)
             avg_conf_loss = (avg_conf_loss * i + conf_loss.numpy()) / (i + 1)
             avg_loc_loss = (avg_loc_loss * i + loc_loss.numpy()) / (i + 1)
+
             if (i + 1) % 10 == 0:
-                print('Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}'.format(
+                tqdm.write('Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}'.format(
                     epoch + 1, i + 1, time.time() - start, avg_loss, avg_conf_loss, avg_loc_loss))
+
 
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0

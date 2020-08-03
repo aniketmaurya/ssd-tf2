@@ -1,10 +1,11 @@
 import os
-from PIL import Image
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import random
+
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from PIL import Image
 
 from box_utils import compute_iou
 
@@ -169,6 +170,31 @@ def horizontal_flip(img, boxes, labels):
         labels: gt labels tensor (num_boxes,)
     """
     img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    boxes = tf.stack([
+        1 - boxes[:, 2],
+        boxes[:, 1],
+        1 - boxes[:, 0],
+        boxes[:, 3]], axis=1)
+
+    return img, boxes, labels
+
+
+@tf.function
+def horizontal_flip_tf(img, boxes, labels):
+    """ Function to horizontally flip the image
+        The gt boxes will be need to be modified accordingly
+
+    Args:
+        img: the original image w/o rescaling and resizing
+        boxes: gt boxes tensor (num_boxes, 4)
+        labels: gt labels tensor (num_boxes,)
+
+    Returns:
+        img: the horizontally flipped tf Image
+        boxes: horizontally flipped gt boxes tensor (num_boxes, 4)
+        labels: gt labels tensor (num_boxes,)
+    """
+    img = tf.image.flip_left_right(img)
     boxes = tf.stack([
         1 - boxes[:, 2],
         boxes[:, 1],

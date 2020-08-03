@@ -25,7 +25,7 @@ def compute_iou(boxes_a, boxes_b):
     Returns:
         overlap: tensor (num_boxes_a, num_boxes_b)
     """
-    assert boxes_a.shape[0] == 8732, "Not 8732"
+    # assert boxes_a.shape[0] == 8732, "Not 8732"
     # boxes_a => num_boxes_a, 1, 4
     boxes_a = tf.expand_dims(boxes_a, 1)
 
