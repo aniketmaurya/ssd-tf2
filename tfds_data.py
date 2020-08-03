@@ -30,7 +30,7 @@ class Dataset:
     """
 
     def __init__(self, default_boxes,
-                 new_size, mode='train', augmentation=None, data_dir='/data/tensorflow_datasets'):
+                 new_size, mode='train', data_dir='/data/tensorflow_datasets'):
         super(Dataset, self).__init__()
         self.idx_to_name = [
             'aeroplane', 'bicycle', 'bird', 'boat',
@@ -40,7 +40,6 @@ class Dataset:
             'sheep', 'sofa', 'train', 'tvmonitor']
         self.name_to_idx = dict([(v, k)
                                  for k, v in enumerate(self.idx_to_name)])
-        self.augmentation = augmentation
         self.mode = mode
         self.new_size = new_size
         self.default_boxes = default_boxes
