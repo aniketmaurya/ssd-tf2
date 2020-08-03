@@ -114,6 +114,7 @@ def create_batch_generator(default_boxes, new_size, batch_size, num_batches=None
         'idx_to_name': train_dataset.idx_to_name,
         'name_to_idx': train_dataset.name_to_idx,
         'length': train_dataset.info.splits['train'].num_examples,
+        'val_length': val_dataset.info.splits['validation'].num_examples,
         # 'image_dir': dataset.image_dir,
         # 'anno_dir': dataset.anno_dir
     }
