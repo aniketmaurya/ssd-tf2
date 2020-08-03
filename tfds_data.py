@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 from box_utils import compute_target
 from image_utils import horizontal_flip_tf
 
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 def draw_boxes(image: np.ndarray, boxes: np.ndarray):
     pil_image = Image.fromarray(image)
@@ -48,7 +49,7 @@ class Dataset:
             shuffle_files=True, with_info=True)
 
         self.info = info
-        self.data = data.map(self.clean_data)
+        self.data = data.map(self.clean_data, AUTOTUNE)
         # self.data = self.scaleup_bbox(self.data)
 
     
@@ -91,16 +92,14 @@ class Dataset:
             labels: tensor of shape (num_gt,)
         """
         data = self.data
-        data = data.map(self.preprocessing)
-        data = data.map(self.map_compute_target)
+        data = data.map(self.preprocessing, AUTOTUNE)
+        data = data.map(self.map_compute_target, AUTOTUNE)
         return data
 
 
-def create_batch_generator(default_boxes,
-                           new_size, batch_size, num_batches=None,
-                           augmentation=True, data_dir='/data/tensorflow_datasets'):
+def create_batch_generator(default_boxes, new_size, batch_size, num_batches=None, prefetch=True, data_dir='/data/tensorflow_datasets'):
     train_dataset = Dataset(default_boxes,
-                            new_size=new_size, mode='train', data_dir=data_dir, augmentation=augmentation)
+                            new_size=new_size, mode='train', data_dir=data_dir)
 
     val_dataset = Dataset(default_boxes,
                           new_size=new_size, mode='validation', data_dir=data_dir)
@@ -114,11 +113,19 @@ def create_batch_generator(default_boxes,
 
     data_gen = train_dataset.generate()
     val_gen = val_dataset.generate()
+
     if batch_size:
         data_gen = data_gen.batch(batch_size)
         val_gen = val_gen.batch(batch_size)
     if num_batches:
         data_gen = data_gen.take(num_batches)
+
+    if prefetch:
+        print('data generator is prefetched...')
+        data_gen = data_gen.prefetch(AUTOTUNE)
+        val_gen = val_gen.prefetch(AUTOTUNE)
+
     print(f'Generated data with batch-size:{batch_size} and num-batches:{num_batches}')
     print(f'{info}')
+
     return data_gen, val_gen, info
