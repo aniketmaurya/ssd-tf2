@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 
 from box_utils import compute_target
 from image_utils import horizontal_flip_tf
+from configs.dataset_confs import classes
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -29,28 +30,27 @@ class Dataset:
         data_dir: dataset data dir (ex: '/data/tensorflow_datasets')
     """
 
-    def __init__(self, default_boxes,
+    def __init__(self, dataset, default_boxes,
                  new_size, mode='train', data_dir='/data/tensorflow_datasets'):
         super(Dataset, self).__init__()
-        self.idx_to_name = [
-            'aeroplane', 'bicycle', 'bird', 'boat',
-            'bottle', 'bus', 'car', 'cat', 'chair',
-            'cow', 'diningtable', 'dog', 'horse',
-            'motorbike', 'person', 'pottedplant',
-            'sheep', 'sofa', 'train', 'tvmonitor']
-        self.name_to_idx = dict([(v, k)
-                                 for k, v in enumerate(self.idx_to_name)])
+        
+        self.idx_to_name = classes.get(dataset)
+        if self.idx_to_name:
+            self.name_to_idx = dict([(v, k)
+                                    for k, v in enumerate(self.idx_to_name)])
         self.mode = mode
         self.new_size = new_size
         self.default_boxes = default_boxes
 
-        data, info = tfds.load(
-            'voc', split=mode,
+        self.tf_data, info = tfds.load(
+            dataset, split=mode,
             data_dir=data_dir,
             shuffle_files=True, with_info=True)
 
         self.info = info
-        self.data = data.map(self.clean_data, AUTOTUNE)
+
+        self.data = self.tf_data.map(self.clean_data, AUTOTUNE)
+
     
     @tf.function
     def augmentation(self, image, boxes, labels):
@@ -81,6 +81,15 @@ class Dataset:
         xy_bbox = tf.concat((bbox[..., -3::-1], bbox[..., -1:-3:-1]), 1)
         
         return filename, image, xy_bbox, labels
+    
+    @tf.function
+    def clean_data_2(self, data):
+        image = data['image']
+        labels = data['label']
+        bbox = data['bbox']
+        # xy_bbox = tf.concat((bbox[..., -3::-1], bbox[..., -1:-3:-1]), 1)
+        
+        return image, bbox, labels
 
     @tf.function
     def map_compute_target(self, filename, image, bbox, labels):
@@ -102,20 +111,26 @@ class Dataset:
         data = data.map(self.map_compute_target, AUTOTUNE)
         return data
 
+    def get_info(self):
+        info = {
+            'idx_to_name': self.idx_to_name,
+            'name_to_idx': self.name_to_idx,
+            'length': self.info.splits['train'].num_examples
+        }
+        return info
 
-def create_batch_generator(default_boxes, new_size, batch_size, num_batches=None, prefetch=True, data_dir='/data/tensorflow_datasets'):
-    train_dataset = Dataset(default_boxes,
+
+def create_batch_generator(dataset, default_boxes, new_size, batch_size, num_batches=None, prefetch=True, data_dir='/data/tensorflow_datasets'):
+    train_dataset = Dataset(dataset, default_boxes,
                             new_size=new_size, mode='train', data_dir=data_dir)
 
-    val_dataset = Dataset(default_boxes,
+    val_dataset = Dataset(dataset, default_boxes,
                           new_size=new_size, mode='validation', data_dir=data_dir)
     info = {
         'idx_to_name': train_dataset.idx_to_name,
         'name_to_idx': train_dataset.name_to_idx,
         'length': train_dataset.info.splits['train'].num_examples,
-        'val_length': val_dataset.info.splits['validation'].num_examples,
-        # 'image_dir': dataset.image_dir,
-        # 'anno_dir': dataset.anno_dir
+        'val_length': val_dataset.info.splits['validation'].num_examples
     }
 
     data_gen = train_dataset.generate()
