@@ -15,6 +15,7 @@ from tfds_data import create_batch_generator
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--arch', default='ssd300')
+parser.add_argument('--dataset', default='voc')
 parser.add_argument('--batch-size', default=32, type=int)
 parser.add_argument('--num-batches', default=None, type=int)
 parser.add_argument('--neg-ratio', default=3, type=int)
@@ -65,7 +66,7 @@ if __name__ == '__main__':
 
     default_boxes = generate_default_boxes(config)
 
-    batch_generator, val_generator, info = create_batch_generator(default_boxes, config['image_size'], args.batch_size,
+    batch_generator, val_generator, info = create_batch_generator(args.dataset, default_boxes, config['image_size'], args.batch_size,
                                                                   args.num_batches)
     try:
         ssd = create_ssd(NUM_CLASSES, args.arch,
@@ -113,7 +114,7 @@ if __name__ == '__main__':
                 tqdm.write('Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}'.format(
                     epoch + 1, i + 1, time.time() - start, avg_loss, avg_conf_loss, avg_loc_loss))
 
-        tqdm.write(f'End of Epoch:{epoch+1}:  Loss: {avg_loss} | Loc Loss: {avg_loc_loss} | Conf Loss: {avg_conf_loss}')
+        tqdm.write(f'End of Epoch:{epoch+1}:  Loss: {avg_loss} | Conf Loss: {avg_conf_loss} | Loc Loss: {avg_loc_loss}')
 
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0
