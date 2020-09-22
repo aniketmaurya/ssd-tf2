@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from box_utils import compute_iou
 
@@ -18,7 +18,6 @@ class ImageVisualizer(object):
         class_colors: colors for drawing boxes and labels
         save_dir: directory to store images
     """
-
     def __init__(self, idx_to_name, class_colors=None, save_dir=None):
         self.idx_to_name = idx_to_name
         if class_colors is None or len(class_colors) != len(self.idx_to_name):
@@ -53,18 +52,23 @@ class ImageVisualizer(object):
             cls_name = self.idx_to_name[idx]
             top_left = (box[0], box[1])
             bot_right = (box[2], box[3])
-            ax.add_patch(patches.Rectangle(
-                (box[0], box[1]),
-                box[2] - box[0], box[3] - box[1],
-                linewidth=2, edgecolor=(0., 1., 0.),
-                facecolor="none"))
+            ax.add_patch(
+                patches.Rectangle((box[0], box[1]),
+                                  box[2] - box[0],
+                                  box[3] - box[1],
+                                  linewidth=2,
+                                  edgecolor=(0., 1., 0.),
+                                  facecolor="none"))
             plt.text(
                 box[0],
                 box[1],
                 s=cls_name,
                 color="white",
                 verticalalignment="top",
-                bbox={"color": (0., 1., 0.), "pad": 0},
+                bbox={
+                    "color": (0., 1., 0.),
+                    "pad": 0
+                },
             )
 
         plt.axis("off")
@@ -95,9 +99,8 @@ def generate_patch(boxes, threshold):
         patch_ymin = random.uniform(0, 1 - patch_h)
         patch_xmax = patch_xmin + patch_w
         patch_ymax = patch_ymin + patch_h
-        patch = np.array(
-            [[patch_xmin, patch_ymin, patch_xmax, patch_ymax]],
-            dtype=np.float32)
+        patch = np.array([[patch_xmin, patch_ymin, patch_xmax, patch_ymax]],
+                         dtype=np.float32)
         patch = np.clip(patch, 0.0, 1.0)
         ious = compute_iou(tf.constant(patch), boxes)
         if tf.math.reduce_any(ious >= threshold):
@@ -127,13 +130,9 @@ def random_patching(img, boxes, labels):
     patch, ious = generate_patch(boxes, threshold)
 
     box_centers = (boxes[:, :2] + boxes[:, 2:]) / 2
-    keep_idx = (
-        (ious > 0.3) &
-        (box_centers[:, 0] > patch[0]) &
-        (box_centers[:, 1] > patch[1]) &
-        (box_centers[:, 0] < patch[2]) &
-        (box_centers[:, 1] < patch[3])
-    )
+    keep_idx = ((ious > 0.3) & (box_centers[:, 0] > patch[0]) &
+                (box_centers[:, 1] > patch[1]) & (box_centers[:, 0] < patch[2])
+                & (box_centers[:, 1] < patch[3]))
 
     if not tf.math.reduce_any(keep_idx):
         return img, boxes, labels
@@ -143,11 +142,11 @@ def random_patching(img, boxes, labels):
     boxes = boxes[keep_idx]
     patch_w = patch[2] - patch[0]
     patch_h = patch[3] - patch[1]
-    boxes = tf.stack([
-        (boxes[:, 0] - patch[0]) / patch_w,
-        (boxes[:, 1] - patch[1]) / patch_h,
-        (boxes[:, 2] - patch[0]) / patch_w,
-        (boxes[:, 3] - patch[1]) / patch_h], axis=1)
+    boxes = tf.stack([(boxes[:, 0] - patch[0]) / patch_w,
+                      (boxes[:, 1] - patch[1]) / patch_h,
+                      (boxes[:, 2] - patch[0]) / patch_w,
+                      (boxes[:, 3] - patch[1]) / patch_h],
+                     axis=1)
     boxes = tf.clip_by_value(boxes, 0.0, 1.0)
 
     labels = labels[keep_idx]
@@ -170,11 +169,8 @@ def horizontal_flip(img, boxes, labels):
         labels: gt labels tensor (num_boxes,)
     """
     img = img.transpose(Image.FLIP_LEFT_RIGHT)
-    boxes = tf.stack([
-        1 - boxes[:, 2],
-        boxes[:, 1],
-        1 - boxes[:, 0],
-        boxes[:, 3]], axis=1)
+    boxes = tf.stack(
+        [1 - boxes[:, 2], boxes[:, 1], 1 - boxes[:, 0], boxes[:, 3]], axis=1)
 
     return img, boxes, labels
 
@@ -195,10 +191,28 @@ def horizontal_flip_tf(img, boxes, labels):
         labels: gt labels tensor (num_boxes,)
     """
     img = tf.image.flip_left_right(img)
-    boxes = tf.stack([
-        1 - boxes[:, 2],
-        boxes[:, 1],
-        1 - boxes[:, 0],
-        boxes[:, 3]], axis=1)
+    boxes = tf.stack(
+        [1 - boxes[:, 2], boxes[:, 1], 1 - boxes[:, 0], boxes[:, 3]], axis=1)
 
     return img, boxes, labels
+
+
+def draw_boxes(image: Image.Image, boxes: list, color='blue'):
+    """
+    image: PIL.Image
+    Boxes: list of label + boxes. Example - [('car', (12, 22, 233, 255))]
+    """
+    draw = ImageDraw.Draw(image)
+    for word in boxes:
+        try:
+            xmin, ymin, xmax, ymax = word[1]
+            label = str(word[0])
+            xy = ((xmin, ymin), (xmax, ymax))
+            text_pos = xmin, ymin - 10
+
+            draw.rectangle(xy, None, color)
+            draw.text(text_pos, label)
+        except Exception as e:
+            print(e)
+
+    return image
