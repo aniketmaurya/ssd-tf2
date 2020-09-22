@@ -89,4 +89,3 @@ def create_losses(neg_ratio, num_classes):
     criterion = SSDLosses(neg_ratio, num_classes)
 
     return criterion
-
